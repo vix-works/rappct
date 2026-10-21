@@ -244,6 +244,8 @@ pub fn merge_parent_env(mut custom: Vec<(OsString, OsString)>) -> Vec<(OsString,
         "TEMP",
         "TMP",
         "PATH",
+        // Required by CreateProcessW for AppContainer children (else error 203).
+        "LOCALAPPDATA",
     ];
 
     fn key_matches(lhs: &OsString, rhs: &str) -> bool {

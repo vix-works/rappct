@@ -83,3 +83,24 @@ fn launch_lpac_cmd_exits_if_supported() {
     assert!(child.pid > 0);
     prof.delete().ok();
 }
+
+/// A caller-supplied environment without LOCALAPPDATA used to fail CreateProcessW
+/// with ERROR_ENVVAR_NOT_FOUND (203) for AppContainer children.
+#[test]
+fn launch_with_minimal_custom_env_succeeds() {
+    let prof = launch_profile("minenv");
+    let caps = internet_caps(&prof);
+    let opts = LaunchOptions {
+        exe: cmd_exe(),
+        cmdline: Some(" /C exit 7".to_string()),
+        env: Some(vec![(
+            "SystemRoot".into(),
+            std::env::var_os("SystemRoot").expect("SystemRoot"),
+        )]),
+        stdio: StdioConfig::Null,
+        ..Default::default()
+    };
+    let child = launch_in_container_with_io(&caps, &opts).expect("launch with minimal env");
+    assert_eq!(child.wait(Some(std::time::Duration::from_secs(10))).expect("wait"), 7);
+    prof.delete().ok();
+}

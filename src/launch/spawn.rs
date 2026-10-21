@@ -136,8 +136,29 @@ fn ensure_lpac_supported(sec: &SecurityCapabilities) -> Result<()> {
 pub(super) fn build_env_block(opts: &LaunchOptions) -> Result<Option<WideBlock>> {
     opts.env
         .as_ref()
-        .map(|env| make_wide_block(env))
+        .map(|env| make_wide_block(&with_localappdata(env)))
         .transpose()
+}
+
+/// For an AppContainer child, CreateProcessW rewrites `LOCALAPPDATA`, `TEMP` and `TMP`
+/// in a caller-supplied environment block to point into the container's profile folder.
+/// If `LOCALAPPDATA` is missing it fails with ERROR_ENVVAR_NOT_FOUND (203) instead
+/// (observed on Windows Server 2025 build 26100). The parent's value never reaches the
+/// child (it is replaced), so copying it in only satisfies that lookup.
+fn with_localappdata(
+    env: &[(std::ffi::OsString, std::ffi::OsString)],
+) -> std::borrow::Cow<'_, [(std::ffi::OsString, std::ffi::OsString)]> {
+    let has = env
+        .iter()
+        .any(|(k, _)| k.to_string_lossy().eq_ignore_ascii_case("LOCALAPPDATA"));
+    match std::env::var_os("LOCALAPPDATA") {
+        Some(v) if !has => {
+            let mut owned = env.to_vec();
+            owned.push(("LOCALAPPDATA".into(), v));
+            std::borrow::Cow::Owned(owned)
+        }
+        _ => std::borrow::Cow::Borrowed(env),
+    }
 }
 
 pub(super) fn build_cwd(opts: &LaunchOptions) -> Option<WideString> {
