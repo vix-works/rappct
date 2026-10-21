@@ -49,11 +49,10 @@ impl AppContainerProfile {
                 // Prepare wide strings using stable WideString buffers
                 let name_w = WideString::from_str(_name);
                 let display_w = WideString::from_str(_display);
-                let desc_w = _description.map(WideString::from_str);
-                let desc_ptr = desc_w
-                    .as_ref()
-                    .map(|w| w.as_pcwstr())
-                    .unwrap_or(PCWSTR::null());
+                // CreateAppContainerProfile rejects a NULL pszDescription with
+                // E_INVALIDARG (0x80070057), so fall back to the display name.
+                let desc_w = WideString::from_str(_description.unwrap_or(_display));
+                let desc_ptr = desc_w.as_pcwstr();
 
                 let mut sid_ptr = std::ptr::null_mut();
                 // Attempt to create
