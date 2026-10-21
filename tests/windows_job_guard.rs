@@ -14,7 +14,9 @@ fn job_guard_kills_on_drop() {
     use std::path::PathBuf;
     use windows::Win32::Foundation::WAIT_OBJECT_0;
     use windows::Win32::System::Threading::WaitForSingleObject;
-    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows::Win32::System::Threading::{
+        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
+    };
 
     let name = format!("rappct.job.guard.{}", std::process::id());
     let profile = AppContainerProfile::ensure(&name, "JobGuard", None).expect("ensure profile");
@@ -44,7 +46,13 @@ fn job_guard_kills_on_drop() {
     // Verify process is gone
     unsafe {
         use windows::Win32::Foundation::CloseHandle;
-        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok();
+        // WaitForSingleObject needs SYNCHRONIZE; without it the wait returns WAIT_FAILED.
+        let h = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            false,
+            pid,
+        )
+        .ok();
         if let Some(hproc) = h {
             let r = WaitForSingleObject(hproc, 2000);
             assert_eq!(
